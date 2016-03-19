@@ -1,13 +1,11 @@
 """
-# Fortio
-A Python IO for Fortran Unformatted Binary File with Variable-Length Records.
+Fortio is a package for reading and writing Fortran Unformatted Records.
 
-## Features:
+Some features:
+- support subrecord (which is necessary for record size larger than 
+  4GB with 4 bytes header)
 - endianess auto-detection
 - able to read data into pre-allocated buffers
-- able to skip over records or jump to wanted record directly without reading data
-- support subrecords (which is necessary for long record whose size larger than 
-  4GB with signed 4 bytes integer header)
 """
 
 __author__ = 'styr <styr.py@gmail.com>'
@@ -45,31 +43,26 @@ class FortranFile(object):
             writing or appending. 
         header_dtype : data-type
             Data type of the record header, default is 'uint32'.
-            If signed type is used, the file will be assumed to contain 
-            subrecords (ie. long records).
         auto_endian: bool
             If true file byteorder will be auto detected, otherwise
             byteorder of given header_dtype will be used.
         """
         if mode not in ['r', 'w', 'a']:
-            raise ValueError("mode must be one of 'r', 'w' or 'a'.")
-
+            raise ValueError("mode must be one of 'r', 'w' or 'a'")
         self._header_dtype = np.dtype(header_dtype)
-        if self._header_dtype.kind == 'u':
-            del self.skip_long_record
-            del self._read_long_record_data
-        elif self._header_dtype.kind == 'i':
-            self.skip_record = self.skip_long_record
-            self._read_record_data = self._read_long_record_data
-        else:
-            raise ValueError('header_dtype should be integer.')
 
         self.file = filename
         self.filesize = os.path.getsize(filename)
         self.mode = mode
         self._fp = open(filename, '%sb' % mode)
 
-        if auto_endian and (self.mode != 'w'):
+        if self._header_dtype.kind != 'u':   
+            if self._header_dtype.kind == 'i':
+                self.skip_record = self._skip_long_record
+                self._read_record_data = self._read_long_record_data
+            else:
+                raise ValueError('header_dtype should be integer.')
+        if auto_endian:
             self._check_byteorder()
 
 
@@ -107,7 +100,6 @@ class FortranFile(object):
                 warnings.warn("byteorder is changed to '%s' by auto detection." 
                 % self._header_dtype.byteorder)
             except IOError:
-                self.close()
                 raise IOError("Invalid fortran file '%s'." %filename)
         self.goto_record(0)
         return self._header_dtype.byteorder
@@ -123,7 +115,7 @@ class FortranFile(object):
         head.tofile(self._fp)
         data.tofile(self._fp)
         head.tofile(self._fp)
-        return data.nbytes
+        return
 
 
     def skip_record(self, nrec=1):
@@ -149,7 +141,7 @@ class FortranFile(object):
         return total
 
 
-    def skip_long_record(self, nrec=1):
+    def _skip_long_record(self, nrec=1):
         '''Skip over the next `nrec` records.
         Parameters
         ----------
@@ -176,7 +168,6 @@ class FortranFile(object):
 
 
     def _read_record_data(self, data):
-        '''data should be array with type `byte`'''
         head = self._read_header()
         nread = self._fp.readinto(data[:head])
         #_assert_head_equal(head, nread)
@@ -186,7 +177,6 @@ class FortranFile(object):
 
 
     def _read_long_record_data(self, data):
-        '''data should be array with type `byte`'''
         total = 0
         while True:
             head = self._read_header()
@@ -194,7 +184,7 @@ class FortranFile(object):
             #_assert_head_abs_equal(head, nread)
             tail = self._read_header()
             _assert_head_abs_equal(head, tail)
-            total += nread
+            total += abs(head)
             if head >= 0: 
                 break
         return total
@@ -230,12 +220,12 @@ class FortranFile(object):
         return size
 
 
-    def read_record(self, dtype='byte', shape=None, nrec=None):
+    def read_record(self, dtype='byte', nrec=None):
         '''Read a record with given dtype from the file.
         Parameters
         ----------
         dtype : data type
-            Data type. The endianess of record header will be used.
+            Data type.
         nrec : int or None
             The record to read. 0 is the first record,
             `None` means the current record.
@@ -246,27 +236,22 @@ class FortranFile(object):
             Data stored in the record.
         '''
         dtype = np.dtype(dtype).newbyteorder(self.byteorder)
-
+        
         self.goto_record(nrec)
         size = self.get_record_size()
         if size % dtype.itemsize:
-            raise ValueError("record size is not multiple of itemsize.")
-        if (shape is not None) and (size != dtype.itemsize * np.prod(shape)):
-            raise ValueError("record size is not equal to wanted size.")
-        
+            raise ValueError("record size is not multiple of itemsize")
         data = np.empty(size, dtype='byte')
         nread = self._read_record_data(data)
-        return data.view(dtype).reshape(shape)
+        return data.view(dtype)
 
 
-    def read_record_into(self, into, offset=None, nrec=None):
+    def read_record_into(self, into, nrec=None):
         '''Read a record from the file into given array.
         Parameters
         ----------
         into : ndarray
             The array to store the record data.
-        offset : int
-            The offset *bytes*.
         nrec : int or None
             The record to read. 0 is the first record,
             `None` means the current record.
@@ -274,22 +259,13 @@ class FortranFile(object):
         Returns
         -------
         nread : int
-            nbytes of read data.
-
-        Notes
-        -----
-        This function does nothing with endianess, you may want
-        to check endianess of data read in yourself if necessary.
+            nbytes of the record.
         '''
-        data = into.reshape(-1).view('byte')
-        if offset is not None:
-            data = data[offset:]
-
         self.goto_record(nrec)
         size = self.get_record_size()
         if size > data.nbytes:
-            raise ValueError("record size is larger than gien array.")
-          
+            raise ValueError("record size is larger than gien array")
+        data = into.view('byte')  
         nread = self._read_record_data(data)
         return nread
 
