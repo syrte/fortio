@@ -56,7 +56,7 @@ class FortranFile(object):
 
         self._header_dtype = np.dtype(header_dtype)
         elif self._header_dtype.kind == 'i':
-            self.skip_record = self.skip_long_record
+            self.skip_record = self._skip_long_record
             self._read_record_data = self._read_long_record_data
         elif self._header_dtype.kind != 'u':
             raise ValueError('header_dtype should be integer.')
