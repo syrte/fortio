@@ -55,13 +55,10 @@ class FortranFile(object):
             raise ValueError("mode must be one of 'r', 'w' or 'a'.")
 
         self._header_dtype = np.dtype(header_dtype)
-        if self._header_dtype.kind == 'u':
-            del self.skip_long_record
-            del self._read_long_record_data
         elif self._header_dtype.kind == 'i':
             self.skip_record = self.skip_long_record
             self._read_record_data = self._read_long_record_data
-        else:
+        elif self._header_dtype.kind != 'u':
             raise ValueError('header_dtype should be integer.')
 
         self.file = filename
@@ -149,7 +146,7 @@ class FortranFile(object):
         return total
 
 
-    def skip_long_record(self, nrec=1):
+    def _skip_long_record(self, nrec=1):
         '''Skip over the next `nrec` records.
         Parameters
         ----------
