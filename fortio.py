@@ -15,7 +15,6 @@ __version__ = '0.2'
 
 import warnings
 import numpy as np
-import os
 
 __all__ = ['FortranFile']
 
@@ -62,7 +61,6 @@ class FortranFile(object):
             raise ValueError('header_dtype should be integer.')
 
         self.file = filename
-        self.filesize = os.path.getsize(filename)
         self.mode = mode
         self._fp = open(filename, '%sb' % mode)
 
