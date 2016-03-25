@@ -15,6 +15,7 @@ __version__ = '0.2'
 
 import warnings
 import numpy as np
+import os
 
 __all__ = ['FortranFile']
 
@@ -60,6 +61,7 @@ class FortranFile(object):
         elif self._header_dtype.kind != 'u':
             raise ValueError('header_dtype should be integer.')
 
+        filename = os.path.abspath(filename)
         self.file = filename
         self.mode = mode
         self._fp = open(filename, '%sb' % mode)
@@ -111,8 +113,9 @@ class FortranFile(object):
     def write_record(self, data):
         '''Write a data record to file.
         '''
+        dtype = getattr(np, self._header_dtype.name)
         data = np.asarray(data)
-        head = self._header_dtype(data.nbytes)
+        head = dtype(data.nbytes)
         if data.nbytes > np.iinfo(self._header_dtype).max:
             raise ValueError('input data is too big for header_dtype.')
         head.tofile(self._fp)
@@ -290,12 +293,20 @@ class FortranFile(object):
 
 
     def close(self):
-        '''Close file'''
+        '''Close file.'''
         self._fp.close()
+
+    def flush(self):
+        '''Flush the buffer.'''
+        self._fp.flush()
 
     def __enter__(self):
         return self
 
     def __exit__(self, type, value, trace):
         self.close()
+
+    def __repr__(self):
+        return "<FortranFile '{}', mode '{}', header_dtype '{}' at {}>".format(
+                self.file, self.mode, self._header_dtype.str, hex(id(self)))
         
