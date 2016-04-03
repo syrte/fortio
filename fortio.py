@@ -3,11 +3,20 @@
 A Python IO for Fortran Unformatted Binary File with Variable-Length Records.
 
 ## Features:
-- endianess auto-detection
+- endianness autodetection
 - able to read data into pre-allocated buffers
 - able to skip over records or jump to wanted record directly without reading data
 - support subrecords (which is necessary for long record whose size larger than 
   4GB with signed 4 bytes integer header)
+- support numpy memmap array
+
+## Usage
+```
+from fortio import FortranFile
+f = FortranFile(filename)
+a = f.read_record('i4')
+b = f.read_record('f4')
+```
 """
 
 __author__ = 'styr <styr.py@gmail.com>'
@@ -34,25 +43,28 @@ class FortranFile(object):
     """Fortran Unformatted Binary file with Variable-Length Records.
     """
     def __init__(self, filename, mode='r', header_dtype='uint32', 
-        auto_endian=True):
+        auto_endian=True, check_file=True):
         """
         Parameters
         ----------
         filename : str
             File to open.
         mode : str
-            The mode can be 'r', 'w' or 'a' for reading (default),
-            writing or appending. 
+            The mode can be 'r' or 'w' for reading (default) or writing. 
         header_dtype : data-type
             Data type of the record header, default is 'uint32'.
             If signed type is used, the file will be assumed to contain 
             subrecords (ie. long records).
         auto_endian: bool
-            If true file byteorder will be auto detected, otherwise
+            If True, file byteorder will be auto detected, otherwise
             byteorder of given header_dtype will be used.
+        check_file: bool
+            If True, header consistency of every record will be checked.
+            This may take a while when the file contains a large number of records.
+            Once checking is finished, record jumping will be faster.
         """
-        if mode not in ['r', 'w', 'a']:
-            raise ValueError("mode must be one of 'r', 'w' or 'a'.")
+        if mode not in ['r', 'w']:
+            raise ValueError("mode must be 'r' or 'w'")
 
         self._header_dtype = np.dtype(header_dtype)
         if self._header_dtype.kind == 'i':
@@ -63,12 +75,17 @@ class FortranFile(object):
 
         filename = os.path.abspath(filename)
         self.file = filename
+        self.filesize = os.path.getsize(filename)
         self.mode = mode
         self._fp = open(filename, '%sb' % mode)
 
-        if auto_endian and (self.mode != 'w'):
-            self._check_byteorder()
-
+        if self.mode != 'w':
+            if auto_endian:
+                self._check_byteorder()
+            if check_file:
+                self._check_file()
+        self.goto_record(0)
+        
 
     @property
     def header_dtype(self):
@@ -101,13 +118,32 @@ class FortranFile(object):
             self._header_dtype = self._header_dtype.newbyteorder()
             try:
                 self.goto_record(1)
-                warnings.warn("byteorder is changed to '%s' by auto detection." 
-                % self._header_dtype.byteorder)
+                msg = ("byteorder of the file is set to '%s' by autodetection." 
+                        % self._header_dtype.byteorder)
+                warnings.warn(msg)
             except IOError:
                 self.close()
-                raise IOError("Invalid fortran file '%s'." %filename)
-        self.goto_record(0)
+                raise ValueError("Invalid fortran file '%s'." %filename)
         return self._header_dtype.byteorder
+
+
+    def _check_file(self):
+        try:
+            self.goto_record(0)
+            offsets, lengths = [], []
+            while True:
+                offset = self._fp.tell()
+                length = self.skip_record()
+                offsets.append(offset)
+                lengths.append(length)
+                if offset == self.filesize:
+                    break
+            self.nrec = len(offsets)
+            self._offsets = offsets
+            self._lengths = lengths            
+        except IOError:
+            self.close()
+            raise ValueError("Invalid fortran file '%s'." %filename)
 
 
     def write_record(self, data):
@@ -129,7 +165,6 @@ class FortranFile(object):
         Parameters
         ----------
         nrec : int or None
-            Do nothing if nrec is None
 
         Returns
         -------
@@ -152,7 +187,6 @@ class FortranFile(object):
         Parameters
         ----------
         nrec : int or None
-            Do nothing if nrec is None
 
         Returns
         -------
@@ -198,43 +232,85 @@ class FortranFile(object):
         return total
 
 
-    def goto_record(self, nrec=None):
-        '''Skip the first `nrec` records from the beginning 
+    def goto_record(self, rec=None):
+        '''Skip the first `rec` records from the beginning 
         of the file.
         Parameters
         ----------
-        nrec : int or None
+        rec : int or None
             The wanted record. 0 is the first record,
-            `None` means the current record.
+            Do nothing if `rec` is None.
         '''
-        if nrec is not None:
-            self._fp.seek(0, 0)
-            self.skip_record(nrec)
+        if rec is not None:
+            if hasattr(self, '_offsets'):
+                self._fp.seek(_offsets[rec], 0)
+            else:
+                self._fp.seek(0, 0)
+                self.skip_record(rec)
         return
 
 
-    def get_record_size(self, nrec=None):
-        '''Get the size of the nrec-th record.
+    def get_record_size(self, rec=None):
+        '''Get the data size of the record.
         Parameters
         ----------
-        nrec : int or None
+        rec : int or None
             The wanted record. 0 is the first record,
             `None` means the current record.
+
+        Returns
+        -------
+        size : int
+            nbytes of the record data. 
+            Note the size of headers is not included.
         '''
+        if rec is not None and hasattr(self, '_lengths'):
+            return self._lengths[rec]
         pos = self._fp.tell()
-        self.goto_record(nrec)
+        self.goto_record(rec)
         size = self.skip_record()
         self._fp.seek(pos, 0)
         return size
 
 
-    def read_record(self, dtype='byte', shape=None, nrec=None):
+    def map_record(self, dtype='byte', shape=None, rec=None):
+        '''Create a numpy memmap of given record.
+        Parameters
+        ----------
+        dtype : data type
+            Data type. The endianess of record header will be used.
+        rec : int or None
+            The record to read. 0 is the first record,
+            `None` means the current record.
+
+        Returns
+        -------
+        result : memmap array
+            Data stored in the record.
+        '''
+        dtype = np.dtype(dtype).newbyteorder(self.byteorder)
+
+        self.goto_record(rec)
+        size = self.get_record_size()
+        if size % dtype.itemsize:
+            raise ValueError("record size is not multiple of itemsize.")
+        if (shape is not None) and (size != dtype.itemsize * np.prod(shape)):
+            raise ValueError("record size is not equal to wanted size.")
+        
+        offset = self._fp.tell() + self.header_dtype.itemsize
+        data = np.memmap(self.file, dtype='byte', mode='r', offset=offset,
+            shape=size)
+        self.skip_record()
+        return data.view(dtype).reshape(shape)
+
+
+    def read_record(self, dtype='byte', shape=None, rec=None):
         '''Read a record with given dtype from the file.
         Parameters
         ----------
         dtype : data type
             Data type. The endianess of record header will be used.
-        nrec : int or None
+        rec : int or None
             The record to read. 0 is the first record,
             `None` means the current record.
 
@@ -245,7 +321,7 @@ class FortranFile(object):
         '''
         dtype = np.dtype(dtype).newbyteorder(self.byteorder)
 
-        self.goto_record(nrec)
+        self.goto_record(rec)
         size = self.get_record_size()
         if size % dtype.itemsize:
             raise ValueError("record size is not multiple of itemsize.")
@@ -257,7 +333,7 @@ class FortranFile(object):
         return data.view(dtype).reshape(shape)
 
 
-    def read_record_into(self, into, offset=None, nrec=None):
+    def read_record_into(self, into, offset=None, rec=None):
         '''Read a record from the file into given array.
         Parameters
         ----------
@@ -265,7 +341,7 @@ class FortranFile(object):
             The array to store the record data.
         offset : int
             The offset *bytes*.
-        nrec : int or None
+        rec : int or None
             The record to read. 0 is the first record,
             `None` means the current record.
         
@@ -283,7 +359,7 @@ class FortranFile(object):
         if offset is not None:
             data = data[offset:]
 
-        self.goto_record(nrec)
+        self.goto_record(rec)
         size = self.get_record_size()
         if size > data.nbytes:
             raise ValueError("record size is larger than gien array.")
