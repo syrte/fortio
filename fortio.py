@@ -59,7 +59,7 @@ class FortranFile(object):
             If True, file byteorder will be auto detected, otherwise
             byteorder of given header_dtype will be used.
         check_file: bool
-            If True, header consistency of every record will be checked.
+            If True, header consistency of every record in the file will be checked.
             This may take a while when the file contains a large number of records.
             Once checking is finished, record jumping will be faster.
         """
@@ -286,7 +286,7 @@ class FortranFile(object):
         result : memmap array
             Data stored in the record.
         '''
-        return read_record(self, dtype=dtype, shape=shape, rec=rec, mmap=True)
+        return self.read_record(dtype=dtype, shape=shape, rec=rec, mmap=True)
 
 
     def read_record(self, dtype='byte', shape=None, rec=None, mmap=False):
