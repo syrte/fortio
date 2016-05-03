@@ -149,11 +149,11 @@ class FortranFile(object):
     def write_record(self, data):
         '''Write a data record to file.
         '''
-        dtype = getattr(np, self._header_dtype.name)
         data = np.asarray(data)
-        head = dtype(data.nbytes)
+        head = np.array(data.nbytes).astype(self._header_dtype) #, casting='safe')
         if data.nbytes > np.iinfo(self._header_dtype).max:
-            raise ValueError('input data is too big for header_dtype.')
+            raise ValueError('input data is too big for header_dtype: %s.'
+                             % self._header_dtype.name)
         head.tofile(self._fp)
         data.tofile(self._fp)
         head.tofile(self._fp)
