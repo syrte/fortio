@@ -31,15 +31,15 @@ __all__ = ['FortranFile']
 
 def _assert_header_equal(head, tail):
     if head != tail:
-        raise ValueError("inconsistent record headers: %d != %d." %(head, tail))
+        raise ValueError("inconsistent record headers: %d != %d." % (head, tail))
 
 
 def _assert_header_abs_equal(head, tail):
     if abs(head) != abs(tail):
-        raise ValueError("inconsistent record headers: %d != %d." %(head, tail))
+        raise ValueError("inconsistent record headers: %d != %d." % (head, tail))
 
 
-def FortranFile(filename, mode='r', header_dtype='uint32', 
+def FortranFile(filename, mode='r', header_dtype='uint32',
                 auto_endian=True, check_file=True):
     header_dtype = np.dtype(header_dtype)
     if header_dtype.kind == 'u':
@@ -49,15 +49,16 @@ def FortranFile(filename, mode='r', header_dtype='uint32',
     else:
         raise ValueError('header_dtype should be integer type.')
 
-    return Factory(filename, mode=mode, header_dtype=header_dtype, 
-                auto_endian=auto_endian, check_file=check_file)
+    return Factory(filename, mode=mode, header_dtype=header_dtype,
+                   auto_endian=auto_endian, check_file=check_file)
 
 
 class FortranRecords(object):
     """Fortran Unformatted Binary file with Variable-Length Records.
     """
-    def __init__(self, filename, mode='r', header_dtype='uint32', 
-                  auto_endian=True, check_file=True):
+
+    def __init__(self, filename, mode='r', header_dtype='uint32',
+                 auto_endian=True, check_file=True):
         """
         Parameters
         ----------
@@ -94,13 +95,11 @@ class FortranRecords(object):
                 self._check_file()
         self.goto_record(0)
 
-
     @property
     def header_dtype(self):
         '''Data type of record header.
         '''
         return self._header_dtype
-
 
     @property
     def byteorder(self):
@@ -108,13 +107,11 @@ class FortranRecords(object):
         '''
         return self._header_dtype.byteorder
 
-
     def _read_header(self):
         '''Read the number of bytes of record data.
         '''
         head, = np.fromfile(self._fp, dtype=self._header_dtype, count=1)
         return head
-
 
     def _check_byteorder(self):
         '''Determinate the byteorder of header_dtype by checking the 
@@ -126,14 +123,13 @@ class FortranRecords(object):
             self._header_dtype = self._header_dtype.newbyteorder()
             try:
                 self.goto_record(1)
-                msg = ("byteorder of the file is set to '%s' by autodetection." 
-                        % self._header_dtype.byteorder)
+                msg = ("byteorder of the file is set to '%s' by autodetection."
+                       % self._header_dtype.byteorder)
                 warnings.warn(msg)
             except ValueError:
                 self.close()
                 raise ValueError("Invalid fortran file '%s'." % self.file)
         return self._header_dtype.byteorder
-
 
     def _check_file(self):
         try:
@@ -148,17 +144,16 @@ class FortranRecords(object):
                 lengths.append(length)
             self.nrec = len(offsets)
             self._offsets = offsets
-            self._lengths = lengths            
+            self._lengths = lengths
         except ValueError:
             self.close()
             raise ValueError("Invalid fortran file '%s'." % self.file)
-
 
     def write_record(self, data):
         '''Write a data record to file.
         '''
         data = np.asarray(data)
-        head = np.array(data.nbytes).astype(self._header_dtype) #, casting='safe')
+        head = np.array(data.nbytes).astype(self._header_dtype)  # , casting='safe')
         if data.nbytes > np.iinfo(self._header_dtype).max:
             raise ValueError('input data is too big for header_dtype: %s.'
                              % self._header_dtype.name)
@@ -166,7 +161,6 @@ class FortranRecords(object):
         data.tofile(self._fp)
         head.tofile(self._fp)
         return data.nbytes
-
 
     def skip_record(self, nrec=1):
         '''Skip over the next `nrec` records.
@@ -189,7 +183,6 @@ class FortranRecords(object):
             total += head
         return total
 
-
     def _read_record_data(self, data):
         '''data should be array with type `byte`'''
         head = self._read_header()
@@ -198,7 +191,6 @@ class FortranRecords(object):
         tail = self._read_header()
         _assert_header_equal(head, tail)
         return nread
-
 
     def goto_record(self, rec=None):
         '''Skip the first `rec` records from the beginning of the file.
@@ -215,7 +207,6 @@ class FortranRecords(object):
                 self._fp.seek(0, 0)
                 self.skip_record(rec)
         return
-
 
     def get_record_size(self, rec=None):
         '''Get the data size of the record.
@@ -237,7 +228,6 @@ class FortranRecords(object):
         self._fp.seek(pos, 0)
         return size
 
-
     def map_record(self, dtype='byte', shape=None, rec=None):
         '''Create a numpy memmap of given record.
         Note that this does not work for subrecords.
@@ -255,7 +245,6 @@ class FortranRecords(object):
             Data stored in the record.
         '''
         return self.read_record(dtype=dtype, shape=shape, rec=rec, mmap=True)
-
 
     def read_record(self, dtype='byte', shape=None, rec=None, mmap=False):
         '''Read a record with given dtype from the file.
@@ -280,16 +269,15 @@ class FortranRecords(object):
             raise ValueError("record size is not multiple of itemsize.")
         if (shape is not None) and (size != dtype.itemsize * np.prod(shape)):
             raise ValueError("record size is not equal to wanted size.")
-        
+
         if mmap and self._header_dtype.kind == 'u':
-            data = np.memmap(self.file, dtype='byte', shape=size, mode='r', 
-                    offset=self._fp.tell() + self.header_dtype.itemsize)
+            data = np.memmap(self.file, dtype='byte', shape=size, mode='r',
+                             offset=self._fp.tell() + self.header_dtype.itemsize)
             self.skip_record()
         else:
             data = np.empty(size, dtype='byte')
             self._read_record_data(data)
         return data.view(dtype).reshape(shape)
-
 
     def read_record_into(self, into, offset=None, rec=None):
         '''Read a record from the file into given array.
@@ -302,7 +290,7 @@ class FortranRecords(object):
         rec : int or None
             The record to read. 0 is the first record,
             `None` means the current record.
-        
+
         Returns
         -------
         nread : int
@@ -321,10 +309,9 @@ class FortranRecords(object):
         size = self.get_record_size()
         if size > data.nbytes:
             raise ValueError("record size is larger than gien array.")
-          
+
         nread = self._read_record_data(data)
         return nread
-
 
     def close(self):
         '''Close file.'''
@@ -342,12 +329,13 @@ class FortranRecords(object):
 
     def __repr__(self):
         return "<FortranFile '{}', mode '{}', header_dtype '{}' at {}>".format(
-                self.file, self.mode, self._header_dtype.str, hex(id(self)))
-        
+            self.file, self.mode, self._header_dtype.str, hex(id(self)))
+
 
 class LongFortranRecords(FortranRecords):
     """Fortran Unformatted Binary file with Variable-Length Records > 4GB.
     """
+
     def skip_record(self, nrec=1):
         '''Skip over the next `nrec` records.
         Parameters
@@ -368,22 +356,20 @@ class LongFortranRecords(FortranRecords):
                 tail = self._read_header()
                 _assert_header_abs_equal(head, tail)
                 total += abs(head)
-                if head >= 0: 
+                if head >= 0:
                     break
         return total
-
 
     def _read_record_data(self, data):
         '''data should be array with type `byte`'''
         total = 0
         while True:
             head = self._read_header()
-            nread = self._fp.readinto(data[total:total+abs(head)])
+            nread = self._fp.readinto(data[total:total + abs(head)])
             #_assert_header_abs_equal(head, nread)
             tail = self._read_header()
             _assert_header_abs_equal(head, tail)
             total += nread
-            if head >= 0: 
+            if head >= 0:
                 break
         return total
-
