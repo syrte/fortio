@@ -1,1 +1,1 @@
-from fortio import *
+from .fortio import *
