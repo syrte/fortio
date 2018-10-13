@@ -182,7 +182,7 @@ class FortranFile(object):
                     self._fp.seek(abs(head), 1)
                     tail = self._read_header()
                     _assert_header_abs_equal(head, tail)
-                    total += abs(head)
+                    total += abs(int(head))
                     if head >= 0:
                         break
         else:
@@ -191,7 +191,7 @@ class FortranFile(object):
                 self._fp.seek(head, 1)
                 tail = self._read_header()
                 _assert_header_equal(head, tail)
-                total += head
+                total += int(head)
         return total
 
     def _read_record_data(self, data):
@@ -211,7 +211,7 @@ class FortranFile(object):
             nread = self._fp.readinto(data[:head])
             tail = self._read_header()
             _assert_header_equal(head, tail)
-            total += head
+            total += nread
         return total
 
     def goto_record(self, rec=None):
@@ -241,7 +241,7 @@ class FortranFile(object):
         Returns
         -------
         size : int
-            nbytes of the record data. 
+            nbytes of the record data.
             Note the size of headers is not included.
         '''
         if hasattr(self, '_lengths'):
