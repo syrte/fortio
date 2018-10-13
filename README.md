@@ -2,64 +2,52 @@
 A Python IO for Fortran Unformatted Binary File with Variable-Length Records.
 
 ## Features:
-- endianness autodetection
-- able to read data into pre-allocated buffers
-- able to skip over records or jump to wanted record directly without reading data
-- support subrecords (which is necessary for long record whose size larger than 
+- read and write Fortran unformatted file
+- auto-detect endianness(byteorder)
+- allow reading data into pre-allocated buffers
+- allow skipping over records or jumping to wanted record directly without reading data
+- support subrecords (which is necessary for long record whose size larger than
   4GB with signed 4 bytes integer header)
-- support numpy memmap array
+- support numpy.memmap array for fast loading
 
 ## Usage
 ```
 from fortio import FortranFile
-f = FortranFile(filename)
-a = f.read_record('i4')
-b = f.read_record('f4')
+with FortranFile(filename) as f:
+    a = f.read_record('i4')
+    f.skip_record()
+    b = f.read_record('f8')
 ```
 
 ## Functions
-FortranFile
-__init__(filename, mode='r', header_dtype='uint32',
+- FortranFile(filename, mode='r', header_dtype='uint32',
          auto_endian=True, check_file=True)
 
-### properties
-mode
-file
-closed
-filesize
-_fp
+- methods
+    * write_record(data)
+    * read_record(dtype='byte', shape=None, rec=None, memmap=False)
+    * mmap_record(dtype='byte', shape=None, rec=None)
+    * read_record_into(into, offset=None, rec=None)
+    * get_record_size(rec=None)
+    * skip_record(nrec=1)
+    * goto_record(rec=None)
+    * close()
+    * flush()
 
-header_dtype
-byteorder
-nrec
-_offsets
-_lengths
+- properties
+    * file
+    * filesize
+    * mode
+    * header_dtype
+    * long_records
+    * closed
+    * byteorder
 
-### internal methods
-_read_header
-_check_byteorder
-_check_file
-_read_record_data(data)
-__enter__
-__exit__
-__repr__
-
-### methods
-write_record(data)
-skip_record(nrec=1)
-goto_record(rec=None)
-get_record_size(rec=None)
-read_record_into(into, offset=None, rec=None)
-read_record(dtype='byte', shape=None, rec=None, mmap=False)
-close
-flush
-
-
-
-close
-closed
-mode
-readinto
-seek
-tell
-write
+- internal properties and methods
+    * _fp
+    * _offsets
+    * _lengths
+    * _read_header()
+    * _check_byteorder()
+    * _check_file()
+    * _read_record_data(data)
