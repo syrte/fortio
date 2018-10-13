@@ -174,7 +174,7 @@ class FortranFile(object):
             nbytes of skipped data. 
             Note the size of headers is not included.
         '''
-        total = np.uint64(0)
+        total = 0
         if self.long_records:
             for i in range(nrec):
                 while True:
@@ -196,7 +196,7 @@ class FortranFile(object):
 
     def _read_record_data(self, data):
         '''data should be array with type `byte`'''
-        total = np.uint64(0)
+        total = 0
         if self.long_records:
             while True:
                 head = self._read_header()
