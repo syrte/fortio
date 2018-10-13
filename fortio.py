@@ -244,7 +244,7 @@ class FortranFile(object):
             nbytes of the record data.
             Note the size of headers is not included.
         '''
-        if hasattr(self, '_lengths'):
+        if (rec is not None) and hasattr(self, '_lengths'):
             size = self._lengths[rec]
         else:
             pos = self._fp.tell()
