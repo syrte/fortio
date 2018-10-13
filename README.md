@@ -1,7 +1,7 @@
 # Fortio
 A Python IO for Fortran Unformatted Binary File with Variable-Length Records.
 
-## Features:
+## Features
 - read and write Fortran unformatted file
 - auto-detect endianness(byteorder)
 - allow reading data into pre-allocated buffers
