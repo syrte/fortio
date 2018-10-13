@@ -244,14 +244,16 @@ class FortranFile(object):
             nbytes of the record data. 
             Note the size of headers is not included.
         '''
-        self.goto_record(rec)
-
-        pos = self._fp.tell()
-        if self.long_records:
-            size = self.skip_record()
+        if hasattr(self, '_lengths'):
+            size = self._lengths[rec]
         else:
-            size = self._read_header()
-        self._fp.seek(pos)
+            pos = self._fp.tell()
+            self.goto_record(rec)
+            if self.long_records:
+                size = self.skip_record()
+            else:
+                size = self._read_header()
+            self._fp.seek(pos)
         return size
 
     def mmap_record(self, dtype='byte', shape=None, rec=None):
