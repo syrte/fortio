@@ -1,6 +1,6 @@
 """
 # Fortio
-A Python IO for Fortran Unformatted Binary File with Variable-Length Records.
+A Python IO for Fortran Unformatted Binary Files with Variable-Length Records.
 
 ## Features
 - read and write Fortran unformatted file
@@ -21,7 +21,7 @@ with FortranFile(filename) as f:
 ```
 """
 
-__author__ = 'styr <styr.py@gmail.com>'
+__author__ = 'Syrtis Major <styr.py@gmail.com>'
 __version__ = '0.4'
 
 import warnings

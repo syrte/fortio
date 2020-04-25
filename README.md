@@ -1,5 +1,5 @@
 # Fortio
-A Python IO for Fortran Unformatted Binary File with Variable-Length Records.
+A Python IO for Fortran Unformatted Binary Files with Variable-Length Records.
 
 ## Features
 - read and write Fortran unformatted file
@@ -9,6 +9,12 @@ A Python IO for Fortran Unformatted Binary File with Variable-Length Records.
 - support subrecords (which is necessary for long record whose size larger than
   4GB with signed 4 bytes integer header)
 - support numpy.memmap array for fast loading
+
+## Installation
+
+```bash
+pip install fortio
+```
 
 ## Usage
 ```
@@ -21,7 +27,7 @@ with FortranFile(filename) as f:
 
 ## Functions
 - FortranFile(filename, mode='r', header_dtype='uint32',
-         auto_endian=True, check_file=True)
+              auto_endian=True, check_file=True)
 
 - methods
     * write_record(data)
